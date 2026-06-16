@@ -1,0 +1,98 @@
+from PIL import Image
+import os
+
+def sembunyikan_file_ke_gambar(jalur_gambar, jalur_file, jalur_keluar="gambar_file_rahasia.png"):
+    # Baca file sebagai data biner
+    if not os.path.exists(jalur_file):
+        return "❌ File yang akan disembunyikan tidak ditemukan"
+    
+    with open(jalur_file, "rb") as f:
+        data = f.read()
+    
+    # Tambah penanda akhir + ukuran data
+    data_biner = ''.join(format(byte, '08b') for byte in data)
+    tanda_akhir = "||||||"
+    data_biner += ''.join(format(ord(c), '08b') for c in tanda_akhir)
+
+    # Buka gambar
+    try:
+        gambar = Image.open(jalur_gambar)
+    except:
+        return "❌ Gagal membuka gambar"
+    
+    lebar, tinggi = gambar.size
+    piksel = gambar.load()
+    kapasitas = lebar * tinggi * 3  # Jumlah bit yang bisa ditampung
+
+    if len(data_biner) > kapasitas:
+        return f"❌ Gambar terlalu kecil! Butuh ukuran lebih besar atau perkecil file. \nKapasitas: {kapasitas//8} byte | Ukuran file: {len(data_biner)//8} byte"
+
+    indeks = 0
+    for y in range(tinggi):
+        for x in range(lebar):
+            if indeks < len(data_biner):
+                r, g, b = piksel[x, y]
+                r = int(format(r, '08b')[:-1] + data_biner[indeks], 2)
+                indeks += 1
+                if indeks < len(data_biner):
+                    g = int(format(g, '08b')[:-1] + data_biner[indeks], 2)
+                    indeks += 1
+                if indeks < len(data_biner):
+                    b = int(format(b, '08b')[:-1] + data_biner[indeks], 2)
+                    indeks += 1
+                piksel[x, y] = (r, g, b)
+            else:
+                break
+        if indeks >= len(data_biner):
+            break
+    gambar.save(jalur_keluar)
+    return f"✅ Berhasil! File tersembunyi di: {jalur_keluar}"
+
+def ambil_file_dari_gambar(jalur_gambar, jalur_simpan="file_hasil_ekstrak.zip"):
+    try:
+        gambar = Image.open(jalur_gambar)
+    except:
+        return "❌ Gagal membuka gambar"
+    
+    lebar, tinggi = gambar.size
+    piksel = gambar.load()
+    data_biner = ""
+
+    for y in range(tinggi):
+        for x in range(lebar):
+            r, g, b = piksel[x, y]
+            data_biner += format(r, '08b')[-1]
+            data_biner += format(g, '08b')[-1]
+            data_biner += format(b, '08b')[-1]
+
+    # Ubah biner ke byte
+    semua_byte = [int(data_biner[i:i+8], 2) for i in range(0, len(data_biner), 8)]
+    data_mentah = bytes(semua_byte)
+
+    # Cari penanda akhir
+    tanda = b"||||||"
+    if tanda in data_mentah:
+        data_bersih = data_mentah.split(tanda)[0]
+        with open(jalur_simpan, "wb") as f:
+            f.write(data_bersih)
+        return f"✅ Berhasil diekstrak! Tersimpan sebagai: {jalur_simpan}"
+    else:
+        return "ℹ️ Tidak ada file tersembunyi atau data rusak"
+
+# Menu
+if __name__ == "__main__":
+    print("=== STEGANOGRAFI FILE (VIDEO/ZIP/APAPUN) ===")
+    print("1. Sembunyikan file ke gambar")
+    print("2. Ambil file dari gambar")
+    pilih = input("Masukkan pilihan (1/2): ")
+
+    if pilih == "1":
+        gmbr = input("Nama file gambar (PNG): ")
+        file = input("Nama file yang akan disembunyikan (bisa ZIP/video): ")
+        print(sembunyikan_file_ke_gambar(gmbr, file))
+    elif pilih == "2":
+        gmbr = input("Nama gambar yang berisi file: ")
+        nama_keluar = input("Nama hasil ekstraksi (misal: video_ku.zip): ")
+        print(ambil_file_dari_gambar(gmbr, nama_keluar))
+    else:
+        print("❌ Pilihan tidak valid")
